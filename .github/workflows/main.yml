@@ -1,0 +1,47 @@
+name: Code Scan with Bandit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  bandit-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit scan
+        id: bandit_scan
+        run: bandit -r . -f json -o bandit_output.json || true
+
+      - name: Analyze Bandit results
+        id: analyze_results
+        run: |
+          CRITICAL_ISSUES=$(jq '.metrics._totals.CRITICAL' bandit_output.json)
+          if [ "$CRITICAL_ISSUES" -gt 0 ]; then
+            echo "critical=true" >> $GITHUB_ENV
+          else
+            echo "critical=false" >> $GITHUB_ENV
+          fi
+
+      - name: Block or merge PR based on scan results
+        if: env.critical == 'true'
+        run: gh pr comment ${{ github.event.pull_request.number }} --body 'Block'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Merge PR
+        if: env.critical == 'false'
+        run: |
+          gh pr merge ${{ github.event.pull_request.number }} --squash --delete-branch --body 'Successful'
+        env:
+          GITHUB_TOKEN: ${{ secrets.TOKEN }}
