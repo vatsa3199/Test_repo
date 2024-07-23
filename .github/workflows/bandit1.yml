@@ -1,25 +1,27 @@
-name: Bandit
-on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    # The branches below must be a subset of the branches above
-    branches: [ "main" ]
-  schedule:
-    - cron: '15 16 * * 5'
+name: Security check - Bandit
+
+on: push
 
 jobs:
-  bandit:
+  build:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - name: Bandit Scan
-        uses: shundor/bandit-action@v1
-        with: # optional arguments
-          path: "."
-          level: high
-          confidence: high
-          exit_zero: true 
-          GITHUB_TOKEN: ${{ secrets.TOKEN }} # Needed to get PR information.
-        
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, macos-latest ]
+    name: Python ${{ matrix.os }} 
 
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Security check - Bandit
+      uses: ioggstream/bandit-report-artifacts@v0.0.2
+      with:
+        project_path: .
+        ignore_failure: true
+
+    # This is optional
+    - name: Security check report artifacts
+      uses: actions/upload-artifact@v1
+      with:
+        name: Security report
+        path: output/security_report.txt
